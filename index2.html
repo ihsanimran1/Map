@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Leaflet Media Map</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    html, body { height: 100%; margin: 0; }
+    #map { height: 100%; width: 100%; }
+
+    .realTarget{
+      width:18px;height:18px;border-radius:50%;
+      background:#23c552; border:2px solid #fff;
+      box-shadow:0 6px 18px rgba(0,0,0,0.35);
+    }
+
+    /* Route info box (hover + click lock) */
+    #routeInfo {
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      z-index: 1200;
+      background: rgba(10,10,10,0.92);
+      color: #fff;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-family: system-ui, sans-serif;
+      display: none;
+      max-width: calc(100vw - 32px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    /* Media panel */
+    #media {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      width: 440px;
+      max-width: calc(100vw - 32px);
+      background: rgba(10,10,10,0.94);
+      color: #fff;
+      border-radius: 12px;
+      display: none;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+      font-family: system-ui, sans-serif;
+      z-index: 1200;
+      overflow: hidden;
+    }
+
+    #mediaHeader {
+      padding: 12px 14px;
+      font-weight: 700;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #closeBtn {
+      background: rgba(255,255,255,0.15);
+      border: 0;
+      color: #fff;
+      border-radius: 6px;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px 10px;
+      line-height: 1;
+    }
+
+    #mediaBody { padding: 12px 14px; }
+
+    .yt-thumb {
+      width: 100%;
+      border-radius: 10px;
+      cursor: pointer;
+      display: block;
+    }
+
+    .yt-title {
+      margin-top: 10px;
+      font-weight: 700;
+      font-size: 16px;
+      line-height: 1.3;
+    }
+
+    .yt-link {
+      margin-top: 6px;
+      font-size: 14px;
+      opacity: 0.85;
+    }
+
+    .yt-link a {
+      color: #fff;
+      text-decoration: underline;
+    }
+
+    iframe {
+      width: 100%;
+      height: 248px;
+      border: 0;
+      border-radius: 10px;
+      margin-top: 10px;
+      background: #000;
+      display: block;
+    }
+
+    /* Images */
+    .img-main {
+      width: 100%;
+      border-radius: 10px;
+      display: block;
+    }
+
+    .thumbRow {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+    }
+
+    .thumbRow img {
+      width: 78px;
+      height: 52px;
+      object-fit: cover;
+      border-radius: 8px;
+      cursor: pointer;
+      opacity: 0.9;
+    }
+
+    /* Red place markers */
+    .hoverTarget {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ff2d2d;
+      border: 2px solid #fff;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+  <div id="routeInfo" title="Click to lock/unlock"></div>
+
+  <div id="media">
+    <div id="mediaHeader">
+      <span id="mediaTitle"></span>
+      <button id="closeBtn" type="button">×</button>
+    </div>
+    <div id="mediaBody"></div>
+  </div>
+
+  <script>
+    // =========================
+    // DATA
+    // =========================
+    const places = [
+      { title: "Krubera Cave", lat: 44.86185352391871, lng: 34.52232062535062, youtubeId: "OPUTLWhhqCo", visitType: "virtual" },
+      { title: "Hanoi to Sapa Route", lat: 21.02929594764382, lng: 105.83187714081436, youtubeId: "JI_Md14CH0Y", visitType: "virtual" },
+      { title: "Mount Everest Summit", lat: 27.989083286129265, lng: 86.9247504130415, youtubeId: "rDYZr8Uz2rE", visitType: "virtual" },
+      { title: "Yakutsk, Siberia", lat: 62.0348, lng: 129.7325, youtubeId: ["D-WGGDRyf68","-IaGmGc4iZ4"], images: [], visitType: "virtual" },
+      { title: "Western Alaska Bering Sea Coast", lat: 60.0, lng: -165.0, youtubeId: "6FJ-kY7TNA0", visitType: "virtual" }
+    ];
+
+    // Define routes ONCE
+    const routes = [
+      {
+        id: "hanoi-sapa",
+        name: "Hanoi → Sapa",
+        visitType: "virtual",     // "real" | "virtual"
+        profile: "driving",
+        a: { lat: 21.02929594764382, lng: 105.83187714081436 },
+        b: { lat: 22.336845755166458, lng: 103.84358760428601 }
+      }
+      // add more routes here
+    ];
+
+    // =========================
+    // MAP
+    // =========================
+    const map = L.map("map", { worldCopyJump: true }).setView([-25, 140], 3);
+
+    const bounds = L.latLngBounds(L.latLng(-85, -180), L.latLng(85, 180));
+    map.setMaxBounds(bounds);
+    map.on("drag", () => map.panInsideBounds(bounds, { animate: false }));
+
+    const streets = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors",
+      noWrap: true,
+      bounds
+    });
+
+    const satelliteWithLabels = L.layerGroup([
+      L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+        maxZoom: 19,
+        attribution: "Tiles © Esri",
+        noWrap: true,
+        bounds
+      }),
+      L.tileLayer("https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", {
+        maxZoom: 19,
+        attribution: "Labels © Esri",
+        noWrap: true,
+        bounds
+      })
+    ]);
+
+    streets.addTo(map);
+
+    // =========================
+    // TWO TOGGLES: Virtual / Real (each contains visits + routes)
+    // =========================
+    const virtualGroup = L.layerGroup().addTo(map);
+    const realGroup    = L.layerGroup().addTo(map);
+
+    const virtualVisits = L.layerGroup().addTo(virtualGroup);
+    const virtualRoutes = L.layerGroup().addTo(virtualGroup);
+
+    const realVisits = L.layerGroup().addTo(realGroup);
+    const realRoutes = L.layerGroup().addTo(realGroup);
+
+    L.control.layers(
+      { "Streets": streets, "Satellite": satelliteWithLabels },
+      { "Virtual visits": virtualGroup, "Real visits": realGroup },
+      { position: "topleft" }
+    ).addTo(map);
+
+    // =========================
+    // ROUTE INFO (hover + click lock)
+    // =========================
+    const routeInfoEl = document.getElementById("routeInfo");
+    let routeLocked = false;
+    let routeHover = false;
+    let routeSummaryText = "";
+
+    function formatKm(m) { return (m / 1000).toFixed(1) + " km"; }
+    function formatTime(s) {
+      const h = Math.floor(s / 3600);
+      const m = Math.round((s % 3600) / 60);
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+    function showRouteInfo() {
+      if (!routeSummaryText) return;
+      routeInfoEl.textContent = routeSummaryText + (routeLocked ? " (locked)" : "");
+      routeInfoEl.style.display = "block";
+    }
+    function hideRouteInfoIfAllowed() {
+      if (routeLocked) return;
+      if (routeHover) return;
+      routeInfoEl.style.display = "none";
+    }
+    routeInfoEl.addEventListener("click", (e) => {
+      e.stopPropagation();
+      routeLocked = !routeLocked;
+      if (routeLocked) showRouteInfo();
+      else hideRouteInfoIfAllowed();
+    });
+
+    // =========================
+    // ROUTES (OSRM) with invisible hitbox
+    // =========================
+    function routeLayerFor(rt) {
+      return rt.visitType === "real" ? realRoutes : virtualRoutes;
+    }
+    function routeTypeLabel(rt) {
+      return rt.visitType === "real" ? "Real route" : "Virtual route";
+    }
+
+    function bindRouteHitEvents(hitPolyline, summaryText) {
+      hitPolyline.on("mouseover", (e) => {
+        L.DomEvent.stop(e);
+        routeHover = true;
+        routeSummaryText = summaryText;
+        showRouteInfo();
+      });
+      hitPolyline.on("mouseout", (e) => {
+        L.DomEvent.stop(e);
+        routeHover = false;
+        hideRouteInfoIfAllowed();
+      });
+      hitPolyline.on("click", (e) => {
+        L.DomEvent.stop(e);
+        routeLocked = !routeLocked;
+        routeSummaryText = summaryText;
+        showRouteInfo();
+      });
+    }
+
+    async function fetchOsrmRoute(a, b, profile = "driving") {
+      const url =
+        `https://router.project-osrm.org/route/v1/${profile}/` +
+        `${a.lng},${a.lat};${b.lng},${b.lat}` +
+        `?overview=full&geometries=geojson&alternatives=false&steps=false`;
+
+      const res = await fetch(url, { mode: "cors" });
+      if (!res.ok) throw new Error(`OSRM HTTP ${res.status}`);
+
+      const data = await res.json();
+      if (!data.routes || !data.routes.length) throw new Error("No routes in OSRM response");
+
+      const r = data.routes[0];
+      const latlngs = r.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+      return { latlngs, distance: r.distance, duration: r.duration };
+    }
+
+    async function drawRoute(rt) {
+      const group = routeLayerFor(rt);
+
+      // waypoint markers
+      L.marker([rt.a.lat, rt.a.lng]).addTo(group);
+      L.marker([rt.b.lat, rt.b.lng]).addTo(group);
+
+      try {
+        const { latlngs, distance, duration } = await fetchOsrmRoute(rt.a, rt.b, rt.profile || "driving");
+
+        // visible route
+        L.polyline(latlngs, { weight: 6, opacity: 0.9 }).addTo(group);
+
+        // invisible hitbox for hover/click
+        const hit = L.polyline(latlngs, { weight: 24, opacity: 0, interactive: true }).addTo(group);
+
+        const summary = `${routeTypeLabel(rt)} • ${rt.name}: ${formatKm(distance)} • ${formatTime(duration)}`;
+        bindRouteHitEvents(hit, summary);
+
+      } catch (err) {
+        console.error("OSRM route failed:", rt.id, err);
+
+        // dotted fallback ONLY on failure
+        const latlngs = [
+          [rt.a.lat, rt.a.lng],
+          [rt.b.lat, rt.b.lng]
+        ];
+
+        L.polyline(latlngs, { weight: 6, opacity: 0.6, dashArray: "6 8" }).addTo(group);
+        const hit = L.polyline(latlngs, { weight: 24, opacity: 0, interactive: true }).addTo(group);
+
+        const summary = `${routeTypeLabel(rt)} • ${rt.name}: unavailable • straight-line fallback`;
+        bindRouteHitEvents(hit, summary);
+      }
+    }
+
+    routes.forEach(rt => drawRoute(rt));
+
+    // =========================
+    // MEDIA PANEL (multi YouTube + images)
+    // =========================
+    const mediaEl = document.getElementById("media");
+    const titleEl = document.getElementById("mediaTitle");
+    const bodyEl = document.getElementById("mediaBody");
+    const closeBtn = document.getElementById("closeBtn");
+
+    let mediaLocked = false;
+    mediaEl.addEventListener("click", (e) => e.stopPropagation());
+
+    function normalizeYouTubeIds(p) {
+      if (Array.isArray(p.youtubeIds)) return p.youtubeIds.filter(Boolean);
+      if (Array.isArray(p.youtubeId)) return p.youtubeId.filter(Boolean);
+      if (typeof p.youtubeId === "string" && p.youtubeId.trim()) return [p.youtubeId.trim()];
+      return [];
+    }
+
+    async function fetchYouTubeTitle(videoId) {
+      const url = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("oEmbed failed");
+      const data = await res.json();
+      return data.title;
+    }
+
+    function renderYouTubeGallery(youtubeIds) {
+      const list = document.createElement("div");
+      list.style.display = "grid";
+      list.style.gridTemplateColumns = "1fr";
+      list.style.gap = "10px";
+
+      youtubeIds.forEach((id) => {
+        const card = document.createElement("div");
+
+        const thumb = document.createElement("img");
+        thumb.className = "yt-thumb";
+        thumb.src = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+        thumb.loading = "lazy";
+        thumb.referrerPolicy = "no-referrer";
+
+        const ytTitle = document.createElement("div");
+        ytTitle.className = "yt-title";
+        ytTitle.textContent = "Loading title…";
+
+        fetchYouTubeTitle(id)
+          .then(t => ytTitle.textContent = t)
+          .catch(() => ytTitle.textContent = "YouTube Video");
+
+        const link = document.createElement("div");
+        link.className = "yt-link";
+        link.innerHTML =
+          `<a href="https://www.youtube.com/watch?v=${id}" target="_blank" rel="noopener noreferrer">Watch on YouTube</a>`;
+
+        thumb.onclick = () => {
+          card.innerHTML = "";
+          const iframe = document.createElement("iframe");
+          iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+          iframe.allowFullscreen = true;
+          iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&playsinline=1`;
+          card.appendChild(iframe);
+          card.appendChild(link);
+        };
+
+        card.appendChild(thumb);
+        card.appendChild(ytTitle);
+        card.appendChild(link);
+        list.appendChild(card);
+      });
+
+      bodyEl.appendChild(list);
+    }
+
+    function renderImagesGallery(images) {
+      const main = document.createElement("img");
+      main.className = "img-main";
+      main.src = images[0];
+      main.loading = "lazy";
+      bodyEl.appendChild(main);
+
+      if (images.length > 1) {
+        const row = document.createElement("div");
+        row.className = "thumbRow";
+
+        images.forEach((src) => {
+          const t = document.createElement("img");
+          t.src = src;
+          t.loading = "lazy";
+          t.onclick = () => { main.src = src; };
+          row.appendChild(t);
+        });
+
+        bodyEl.appendChild(row);
+      }
+    }
+
+    function renderMedia(p) {
+      titleEl.textContent = p.title || "Location";
+      bodyEl.innerHTML = "";
+
+      const ytIds = normalizeYouTubeIds(p);
+      const imgs = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
+
+      const hasYt = ytIds.length > 0;
+      const hasImgs = imgs.length > 0;
+
+      if (!hasYt && !hasImgs) {
+        bodyEl.textContent = "No media set for this location.";
+        mediaEl.style.display = "block";
+        return;
+      }
+
+      if (hasYt) {
+        const h = document.createElement("div");
+        h.style.fontWeight = "700";
+        h.style.marginBottom = "8px";
+        h.textContent = "Videos";
+        bodyEl.appendChild(h);
+        renderYouTubeGallery(ytIds);
+      }
+
+      if (hasImgs) {
+        const sep = document.createElement("div");
+        sep.style.height = "1px";
+        sep.style.background = "rgba(255,255,255,0.12)";
+        sep.style.margin = "12px 0";
+        bodyEl.appendChild(sep);
+
+        const h2 = document.createElement("div");
+        h2.style.fontWeight = "700";
+        h2.style.marginBottom = "8px";
+        h2.textContent = "Photos";
+        bodyEl.appendChild(h2);
+
+        renderImagesGallery(imgs);
+      }
+
+      mediaEl.style.display = "block";
+    }
+
+    function closeMedia() {
+      mediaLocked = false;
+      mediaEl.style.display = "none";
+      bodyEl.innerHTML = "";
+    }
+
+    closeBtn.onclick = (e) => {
+      e.stopPropagation();
+      closeMedia();
+    };
+
+    map.on("click", () => {
+      closeMedia();
+      routeHover = false;
+      hideRouteInfoIfAllowed();
+    });
+
+    // =========================
+    // PLACE MARKERS (Virtual=red, Real=green) hover + click lock
+    // =========================
+    const virtualIcon = L.divIcon({
+      className: "",
+      html: '<div class="hoverTarget"></div>',
+      iconSize: [18, 18],
+      iconAnchor: [9, 9]
+    });
+
+    const realIcon = L.divIcon({
+      className: "",
+      html: '<div class="realTarget"></div>',
+      iconSize: [18, 18],
+      iconAnchor: [9, 9]
+    });
+
+    places.forEach((p) => {
+      const isReal = (p.visitType || "virtual") === "real";
+      const icon = isReal ? realIcon : virtualIcon;
+      const layer = isReal ? realVisits : virtualVisits;
+
+      const m = L.marker([p.lat, p.lng], { icon }).addTo(layer);
+
+      m.on("mouseover", () => { if (!mediaLocked) renderMedia(p); });
+      m.on("mouseout",  () => { if (!mediaLocked) closeMedia(); });
+
+      m.on("click", (e) => {
+        e.originalEvent.stopPropagation();
+        mediaLocked = !mediaLocked;
+        renderMedia(p);
+      });
+    });
+  </script>
+</body>
+</html>
