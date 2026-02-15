@@ -171,7 +171,8 @@
       { title: "Mount Everest Summit", lat: 27.989083286129265, lng: 86.9247504130415, youtubeId: "rDYZr8Uz2rE", visitType: "virtual" },
       { title: "Yakutsk, Siberia", lat: 62.0348, lng: 129.7325, youtubeId: ["D-WGGDRyf68","-IaGmGc4iZ4"], images: [], visitType: "virtual" },
       { title: "Western Alaska Bering Sea Coast", lat: 60.0, lng: -165.0, youtubeId: "6FJ-kY7TNA0", visitType: "virtual" },
-      { title: "Seoul to Busan Walking", lat: 37.5665, lng: 126.9780, youtubeId: "SmqHKzsske8", visitType: "virtual" }
+      { title: "Seoul to Busan Walking", lat: 37.5665, lng: 126.9780, youtubeId: "SmqHKzsske8", visitType: "virtual" },
+      { title: "Grampians Trip", lat: -37.22130471693513, lng: 142.5398767885015, video: {type: "gdrive", fileId: "1yConl4qzzfEL4jAFvLdeeHhDLJ3IpSpP"}, instagramReel: {url: "https://www.instagram.com/p/DUfmX4oEgu2/"}, visitType: "real" }
     ];
 
     // Define routes ONCE
@@ -496,6 +497,62 @@
       }
     }
 
+    function renderInstagramReel(reel) {
+      const card = document.createElement("div");
+
+      card.style.border = "1px solid rgba(255,255,255,0.15)";
+      card.style.borderRadius = "10px";
+      card.style.padding = "12px";
+      card.style.cursor = "pointer";
+
+      const title = document.createElement("div");
+      title.style.fontWeight = "700";
+      title.textContent = "Instagram Reel";
+
+      const hint = document.createElement("div");
+      hint.style.opacity = "0.8";
+      hint.style.fontSize = "14px";
+      hint.textContent = "Tap to open in Instagram";
+
+      card.appendChild(title);
+      card.appendChild(hint);
+
+      card.onclick = () => {
+        window.open(reel.url, "_blank", "noopener");
+      };
+
+      bodyEl.appendChild(card);
+    }
+
+    function hasVideo(p) {
+      return !!(p.video && (
+        (p.video.type === "gdrive" && p.video.fileId) ||
+        (p.video.type === "local" && p.video.src)
+      ));
+    }
+
+    function renderDriveVideo(fileId) {
+      const iframe = document.createElement("iframe");
+      iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+      iframe.allow = "autoplay";
+      iframe.style.width = "100%";
+      iframe.style.height = "260px";
+      iframe.style.border = "0";
+      iframe.style.borderRadius = "10px";
+      iframe.style.display = "block";
+      bodyEl.appendChild(iframe);
+    }
+
+    function renderLocalVideo(src) {
+      const v = document.createElement("video");
+      v.src = src;
+      v.controls = true;
+      v.playsInline = true;
+      v.style.width = "100%";
+      v.style.borderRadius = "10px";
+      bodyEl.appendChild(v);
+    }
+
     function renderMedia(p) {
       titleEl.textContent = p.title || "Location";
       bodyEl.innerHTML = "";
@@ -505,29 +562,72 @@
 
       const hasYt = ytIds.length > 0;
       const hasImgs = imgs.length > 0;
+      const hasIg = !!(p.instagramReel && p.instagramReel.url);
+      const hasVid = hasVideo(p);
 
-      if (!hasYt && !hasImgs) {
+      if (!hasYt && !hasImgs && !hasIg && !hasVid) {
         bodyEl.textContent = "No media set for this location.";
         mediaEl.style.display = "block";
         return;
       }
 
-      if (hasYt) {
+      // Video
+      if (hasVid) {
         const h = document.createElement("div");
         h.style.fontWeight = "700";
         h.style.marginBottom = "8px";
-        h.textContent = "Videos";
+        h.textContent = "Video";
         bodyEl.appendChild(h);
+
+        if (p.video.type === "gdrive") renderDriveVideo(p.video.fileId);
+        if (p.video.type === "local")  renderLocalVideo(p.video.src);
+      }
+
+      // Instagram
+      if (hasIg) {
+        if (hasVid) {
+          const sep = document.createElement("div");
+          sep.style.height = "1px";
+          sep.style.background = "rgba(255,255,255,0.12)";
+          sep.style.margin = "12px 0";
+          bodyEl.appendChild(sep);
+        }
+        const hIg = document.createElement("div");
+        hIg.style.fontWeight = "700";
+        hIg.style.marginBottom = "8px";
+        hIg.textContent = "Instagram";
+        bodyEl.appendChild(hIg);
+
+        renderInstagramReel(p.instagramReel);
+      }
+
+      // YouTube
+      if (hasYt) {
+        if (hasVid || hasIg) {
+          const sep = document.createElement("div");
+          sep.style.height = "1px";
+          sep.style.background = "rgba(255,255,255,0.12)";
+          sep.style.margin = "12px 0";
+          bodyEl.appendChild(sep);
+        }
+        const hYt = document.createElement("div");
+        hYt.style.fontWeight = "700";
+        hYt.style.marginBottom = "8px";
+        hYt.textContent = "Videos";
+        bodyEl.appendChild(hYt);
+
         renderYouTubeGallery(ytIds);
       }
 
+      // Photos
       if (hasImgs) {
-        const sep = document.createElement("div");
-        sep.style.height = "1px";
-        sep.style.background = "rgba(255,255,255,0.12)";
-        sep.style.margin = "12px 0";
-        bodyEl.appendChild(sep);
-
+        if (hasVid || hasIg || hasYt) {
+          const sep = document.createElement("div");
+          sep.style.height = "1px";
+          sep.style.background = "rgba(255,255,255,0.12)";
+          sep.style.margin = "12px 0";
+          bodyEl.appendChild(sep);
+        }
         const h2 = document.createElement("div");
         h2.style.fontWeight = "700";
         h2.style.marginBottom = "8px";
