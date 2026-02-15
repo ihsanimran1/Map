@@ -167,10 +167,11 @@
     // =========================
     const places = [
       { title: "Krubera Cave", lat: 44.86185352391871, lng: 34.52232062535062, youtubeId: "OPUTLWhhqCo", visitType: "virtual" },
-      { title: "Hanoi to Sapa Route", lat: 21.02929594764382, lng: 105.83187714081436, youtubeId: "JI_Md14CH0Y", visitType: "virtual" },
+      { title: "Hanoi to Sapa Bike Route", lat: 21.02929594764382, lng: 105.83187714081436, youtubeId: "JI_Md14CH0Y", visitType: "virtual" },
       { title: "Mount Everest Summit", lat: 27.989083286129265, lng: 86.9247504130415, youtubeId: "rDYZr8Uz2rE", visitType: "virtual" },
       { title: "Yakutsk, Siberia", lat: 62.0348, lng: 129.7325, youtubeId: ["D-WGGDRyf68","-IaGmGc4iZ4"], images: [], visitType: "virtual" },
-      { title: "Western Alaska Bering Sea Coast", lat: 60.0, lng: -165.0, youtubeId: "6FJ-kY7TNA0", visitType: "virtual" }
+      { title: "Western Alaska Bering Sea Coast", lat: 60.0, lng: -165.0, youtubeId: "6FJ-kY7TNA0", visitType: "virtual" },
+      { title: "Seoul to Busan Walking", lat: 37.5665, lng: 126.9780, youtubeId: "SmqHKzsske8", visitType: "virtual" }
     ];
 
     // Define routes ONCE
@@ -182,7 +183,17 @@
         profile: "driving",
         a: { lat: 21.02929594764382, lng: 105.83187714081436 },
         b: { lat: 22.336845755166458, lng: 103.84358760428601 }
+      },
+
+      {
+        id: "seoul-busan",
+        name: "Seoul → Busan",
+        visitType: "virtual",
+        profile: "walking",
+        a: { lat: 37.5665, lng: 126.9780 },
+        b: { lat: 35.1796, lng: 129.0756 }
       }
+  
       // add more routes here
     ];
 
